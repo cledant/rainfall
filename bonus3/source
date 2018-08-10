@@ -1,0 +1,26 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+	FILE	*stream;
+	char	buff[132];
+
+	stream = fopen("/home/user/end/.pass", "r");
+	bzero(buff, 132);
+	if (stream != NULL && argc == 2)
+	{
+		fread(buff, 1, 66, stream);
+		buff[65] = '\0';
+		buff[atoi(argv[1])] = '\0';
+		fread(buff + 66, 1, 65, stream);
+		fclose(stream);
+		if (strcmp(buff, argv[1]) == 0)
+			execl("/bin/sh", "sh", NULL);
+		else
+			puts(buff + 66);
+	}
+	return (0);
+}

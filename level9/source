@@ -1,0 +1,43 @@
+#include <cstdlib>
+#include <cstring>
+
+class N
+{
+		public :		
+				N(int init_nb);
+				void	setAnnotation(char *str);
+
+				N		&operator+(N &rhs);
+
+				int		_nb;						//situer a 0x68 du ptr d'origine
+				char	_annotation[100];
+};
+
+void	N::setAnnotation(char *str)
+{
+		std::memcpy(this->_annotation, str, std::strlen(str));
+}
+
+N	&N::operator+(N &rhs)
+{
+		this->_nb = this->_nb + rhs._nb;
+		return (*this);
+}
+
+N::N(int init_nb)
+{
+		this->_nb = init_nb;
+}
+
+int		main(int argc, char **argv)
+{
+		N	*ptr1;
+		N	*ptr2;
+
+		if (argc == 1)
+				std::exit(0);
+		ptr1 = new N(5);
+		ptr2 = new N(6);
+		ptr1->setAnnotation(argv[1]);
+		*ptr1 = *ptr1 + *ptr2;
+}

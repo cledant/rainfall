@@ -1,0 +1,24 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+void p(char *buff)
+{
+	printf(buff);
+}
+
+void n(void)
+{
+	char			buff[512];		//0xbffff510
+	static 	int		flag;			//0x08049810
+
+	fgets(buff, 512, stdin);
+	p(buff);
+	if (flag == 0x01025544)
+		system("/bin/cat /home/user/level5/.pass");
+}
+
+int main (void)
+{
+	n();
+	return (0);
+}

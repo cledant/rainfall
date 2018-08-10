@@ -1,0 +1,40 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void	p(char *str, char *cte)
+{
+	char	mega_buff[4096];
+	char	*nl;
+
+	puts(cte);
+	read(0, mega_buff, 4096);
+	nl = strchr(mega_buff, '\n');
+	*nl = '\0';
+	strncpy(str, mega_buff, 20);
+}
+
+void	pp(char *str)
+{
+	char	buff[20];	//0xbffff698
+	char	buff_2[20]; //0xbffff6ac
+	size_t	len;
+
+	p(buff, " - ");
+	p(buff_2, " - ");
+	strcpy(str, buff);
+	len = strlen(buff);
+	len--;
+	str[len] = ' ';
+	strcat(str, buff_2);
+}
+
+int		main(void)
+{
+	char	buff[40];	//0xbffff6e6
+
+	pp(buff);
+	puts(buff);
+	return (0);
+}

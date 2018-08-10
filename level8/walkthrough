@@ -1,0 +1,17 @@
+- Apres analyse du code asm, on se rend compte que pour lancer
+un shell avec les droit pour lire /home/level9/.pass,
+il faut que l'adresse de la variable auth + 32 soit non nulle
+- On voit que la string "auth ", alloue un malloc de 4
+- On voit que "service", fait un strdup du restant de la string apres "service"
+si elle a une taille inférieur a 30
+- Le but va etre d'occuper la mémoire a l'adresse de auth + 32 afin de lancer un shell
+
+
+- Exploit :
+
+1) On lance ./level8
+2) On tape la string "auth "
+3) On tape la string "serviceaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+4) On tape "login"
+5) On obtient un shell
+6) cat /home/user/level9/.pass

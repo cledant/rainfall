@@ -1,0 +1,26 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void n(void)
+{
+	system("/bin/cat /home/user/level7/.pass");
+}
+
+void m(void)
+{
+	puts("Nope");
+}
+
+int		main(int argc, char **argv)
+{
+	char	*buff;
+	void	(*ptr_fct)(void);
+
+	buff = (char *)malloc(64);
+	ptr_fct = (void *)malloc(4);
+	ptr_fct = &m;
+	strcpy(buff, argv[1]);
+	(ptr_fct)();
+	return (0);
+}

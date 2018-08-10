@@ -1,0 +1,16 @@
+- Apres analyse du code asm, on se rend compte qu'il y a 2 fonction en plus du main.
+- Une qui écrit "Nope" avec puts et une qui lance un cat du password du level7 ==> "m"
+- On se rend compte aussi qu'une de ces fonctions sont utilisée avec un
+pointeur dur fonction. ===> "n"
+- On voit aussi qu'il y a 2 variable malloc : une pour copier argv[1] et une
+qui se fait asssignée un ptr sur "m".
+- Les 2 variable malloc sont relativement proche. Le pointeur peut etre overwrite
+grace au strcpy.
+- Le buffer se trouve en 0x0804a008 et le ptr sur fct en 0x0804a050
+- La différence entre les 2 adresse nous donne une taille de 72
+
+- On va écrire 72 "A" puis ensuite écrire l'addresse de la fonction "n".
+
+- Exploit :
+
+ ./level6 `python -c 'print "A" * 72 + "\x54\x84\x04\x08"'`

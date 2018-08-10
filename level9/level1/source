@@ -1,0 +1,9 @@
+#include <stdio.h>
+
+int		main(void)
+{
+	char	buff[72];
+
+	gets(buff);
+	return (0);
+}

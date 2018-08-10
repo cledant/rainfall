@@ -1,0 +1,27 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void p(void)
+{
+	char	buff[80];
+
+	fflush(stdout);
+	gets(buff);
+	if (((int)(buff[80]) & 0xb0000000) == 0xb0000000)
+	{
+		printf("(%p)\n", buff[80]);
+		exit (1);
+	}
+	else
+	{
+		puts(buff);
+		strdup(buff);
+	}
+}
+
+int main(void)
+{
+	p();
+	return (0);
+}

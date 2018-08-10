@@ -1,0 +1,7 @@
+- Apres analyse du code asm on se rend compte qu'on compare le 1er argument de
+level0 et s'il est égal a 423 celle lance un shell avec l'uid de l utilisateur
+level 1
+
+./level0 423
+cd /home/user/level1
+cat .pass

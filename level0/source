@@ -1,0 +1,30 @@
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+	static const char *str = "No !\n";
+	static const char *shell = "/bin/sh";
+	char	arg_exec[2][200];
+	uid_t	euid;
+	gid_t	egid;
+
+	if (atoi(argv[1]) == 423)
+	{
+		strcpy(argv[0], shell);				//strdup here in asm
+		arg_exec[1][0] = '\0';
+		egid = getegid();
+		euid = geteuid();
+		setresgid(egid, egid, egid);
+		setresuid(euid, euid, euid);
+		execv(shell, (char *const*)arg_exec);
+	}
+	else
+	{
+		fwrite(str, 1, 4, stderr);
+	}
+	return (0);
+}

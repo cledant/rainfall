@@ -1,0 +1,22 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+void 	v(void)
+{
+	char			buff[512];		//0xbffff510
+	static int		value = 0;		//0x0804988c
+
+	fgets(buff, 512, stdin);
+	printf(buff);
+	if (value == 0x40)
+	{
+		fwrite("Wait what?!\n", 1, 14, stdout);
+		system("/bin/sh");
+	}
+}
+
+int		main(void)
+{
+	v();
+	return (0);
+}

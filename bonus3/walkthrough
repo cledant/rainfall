@@ -1,0 +1,10 @@
+- Apres analyse du code asm, on remarque que le programe lit le fichier
+contenant le flag. Il compare ensuite ce buffer a argv[1] pour lancer un shell
+si les 2 string sont egales.
+
+- On remarque que l'on peut ecrire un '\0' sur la stack avec le 1er argument.
+
+- Si le 1er arguement est vide, atoi va retourner 0 et ecrire un '\0' sur le 1er
+char du buffer et rendre la comparaison avec argv[1] valide.
+
+./bonus3 ""
